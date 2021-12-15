@@ -10,8 +10,6 @@ import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {PermissionAdmin} from './PermissionAdmin.sol';
 import {IUnboundStaking} from './interfaces/IUnboundStaking.sol';
 
-import 'hardhat/console.sol';
-
 /// Allow stakers to stake unbound token and receive reward tokens
 /// Allow extend or renew a pool to continue/restart the staking program
 /// When harvesting, rewards will be transferred to a user account
