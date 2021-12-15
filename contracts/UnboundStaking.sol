@@ -552,12 +552,11 @@ contract UnboundStaking is IUnboundStaking, PermissionAdmin, ReentrancyGuard {
    * @dev Withdraw rewards to user account
    */
   function _safeTransferRewards(IERC20 token, address _account, uint256 _amount) internal {
-    uint256 value = token == IERC20(address(0)) ? _amount : 0;
     if (token == IERC20(address(0))) {
-      (bool success, ) = _account.call{value: value}('');
+      (bool success, ) = _account.call{value: _amount}('');
       require(success, 'fail to transfer');
     } else {
-      token.safeTransfer(_account, value);
+      token.safeTransfer(_account, _amount);
     }
   }
 }
