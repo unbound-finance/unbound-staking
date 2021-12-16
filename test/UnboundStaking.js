@@ -8,6 +8,7 @@ let unboundStaking;
 
 const POOL_PERIOD = 1000; // in blocks
 const UNB_REWARDS_PER_BLOCK = "1" // 1 UNB per block (ignoring decimals for tests)
+const BLOCK_LOCK_DURATION = 150 // user can not unlock deposit before startblock + BLOCK_LOCK_DURATION blocks
 
 describe('UnboundStaking', function () {
 
@@ -53,11 +54,13 @@ describe('UnboundStaking', function () {
             let currentBlock = await ethers.provider.getBlockNumber()
             let startBlock = Number(currentBlock) + 2
             let endBlock = Number(startBlock) + POOL_PERIOD
+            let releaseBlock = Number(startBlock) + BLOCK_LOCK_DURATION
 
             await unboundStaking.addPool(
                 unboundToken.address, 
                 startBlock, 
-                endBlock, 
+                endBlock,
+                releaseBlock,
                 [UNB_REWARDS_PER_BLOCK]
             );
 
@@ -71,11 +74,13 @@ describe('UnboundStaking', function () {
             let currentBlock = await ethers.provider.getBlockNumber()
             let startBlock = Number(currentBlock) + 2
             let endBlock = Number(startBlock) + POOL_PERIOD
+            let releaseBlock = Number(startBlock) + BLOCK_LOCK_DURATION
 
             await unboundStaking.addPool(
                 unboundToken.address, 
                 startBlock, 
-                endBlock, 
+                endBlock,
+                releaseBlock,
                 [UNB_REWARDS_PER_BLOCK]
             );
 
@@ -96,11 +101,13 @@ describe('UnboundStaking', function () {
             let currentBlock = await ethers.provider.getBlockNumber()
             let startBlock = Number(currentBlock) + 2
             let endBlock = Number(startBlock) + POOL_PERIOD
+            let releaseBlock = Number(startBlock) + BLOCK_LOCK_DURATION
 
             await unboundStaking.addPool(
                 unboundToken.address, 
                 startBlock, 
-                endBlock, 
+                endBlock,
+                releaseBlock,
                 [UNB_REWARDS_PER_BLOCK]
             );
 
@@ -113,11 +120,13 @@ describe('UnboundStaking', function () {
             let currentBlock = await ethers.provider.getBlockNumber()
             let startBlock = Number(currentBlock) + 2
             let endBlock = Number(startBlock) + POOL_PERIOD
+            let releaseBlock = Number(startBlock) + BLOCK_LOCK_DURATION
 
             await expect(unboundStaking.addPool(
                 unboundToken.address, 
                 startBlock, 
-                endBlock, 
+                endBlock,
+                releaseBlock,
                 [UNB_REWARDS_PER_BLOCK]
             ))
             .to.emit(unboundStaking, "AddNewPool")
@@ -152,11 +161,13 @@ describe('UnboundStaking', function () {
             let currentBlock = await ethers.provider.getBlockNumber()
             let startBlock = Number(currentBlock) + 2
             let endBlock = Number(startBlock) + POOL_PERIOD
+            let releaseBlock = Number(startBlock) + BLOCK_LOCK_DURATION
 
             await unboundStaking.addPool(
                 unboundToken.address, 
                 startBlock, 
-                endBlock, 
+                endBlock,
+                releaseBlock,
                 [UNB_REWARDS_PER_BLOCK]
             );
 
@@ -170,7 +181,7 @@ describe('UnboundStaking', function () {
 
             await unboundToken.connect(signers[1]).approve(unboundStaking.address, "100");
 
-            await unboundStaking.connect(signers[1]).deposit(0, "100", true);
+            await unboundStaking.connect(signers[1]).deposit(0, "100");
 
             let userInfoAfter = await unboundStaking.getUserInfo(0, signers[1].address);
 
@@ -186,7 +197,7 @@ describe('UnboundStaking', function () {
 
             await unboundToken.connect(signers[1]).approve(unboundStaking.address, "100");
 
-            await unboundStaking.connect(signers[1]).deposit(0, "100", true);
+            await unboundStaking.connect(signers[1]).deposit(0, "100");
 
             let poolInfoAfter = await unboundStaking.getPoolInfo(0);
 
@@ -202,7 +213,7 @@ describe('UnboundStaking', function () {
             expect(await unboundToken.balanceOf(unboundStaking.address)).to.be.equal(totalRewardAmount);
 
             await unboundToken.connect(signers[1]).approve(unboundStaking.address, "100");
-            await expect(unboundStaking.connect(signers[1]).deposit(0, "100", true))
+            await expect(unboundStaking.connect(signers[1]).deposit(0, "100"))
                 .to.emit(unboundToken, "Transfer")
                 .withArgs(signers[1].address, unboundStaking.address, "100");
 
@@ -217,7 +228,7 @@ describe('UnboundStaking', function () {
 
             await unboundToken.connect(signers[1]).approve(unboundStaking.address, "100");
 
-            let deposit = await unboundStaking.connect(signers[1]).deposit(0, "100", true);
+            let deposit = await unboundStaking.connect(signers[1]).deposit(0, "100");
 
             await expect(deposit).to.emit(unboundStaking, "Deposit")
                 .withArgs(signers[1].address, 0, deposit.blockNumber, "100");
@@ -261,25 +272,27 @@ describe('UnboundStaking', function () {
             let currentBlock = await ethers.provider.getBlockNumber()
             let startBlock = Number(currentBlock) + 2
             let endBlock = Number(startBlock) + POOL_PERIOD
+            let releaseBlock = Number(startBlock) + BLOCK_LOCK_DURATION
 
             await unboundStaking.addPool(
                 unboundToken.address, 
                 startBlock, 
-                endBlock, 
+                endBlock,
+                releaseBlock,
                 [UNB_REWARDS_PER_BLOCK]
             );
 
             // user 1 deposit 100 unb
             await unboundToken.connect(signers[1]).approve(unboundStaking.address, "100");
-            await unboundStaking.connect(signers[1]).deposit(0, "100", true);
+            await unboundStaking.connect(signers[1]).deposit(0, "100");
 
             // user 2 deposit 300 unb
             await unboundToken.connect(signers[2]).approve(unboundStaking.address, "300");
-            await unboundStaking.connect(signers[2]).deposit(0, "300", true);
+            await unboundStaking.connect(signers[2]).deposit(0, "300");
 
             // user 3 deposit 600 unb
             await unboundToken.connect(signers[3]).approve(unboundStaking.address, "600");
-            await unboundStaking.connect(signers[3]).deposit(0, "600", true);
+            await unboundStaking.connect(signers[3]).deposit(0, "600");
 
         })
 
@@ -292,6 +305,8 @@ describe('UnboundStaking', function () {
             expect(userInfoBefore1.amount).to.be.equal(100);
             expect(userInfoBefore2.amount).to.be.equal(300);
             expect(userInfoBefore3.amount).to.be.equal(600);
+
+            await mineBlocks(150); // time travel lock duration
 
             await unboundStaking.connect(signers[1]).withdrawAll(0);
             await unboundStaking.connect(signers[2]).withdrawAll(0);
@@ -309,6 +324,8 @@ describe('UnboundStaking', function () {
 
 
         it('withdrawAll - should decrease total stake amount after withdraw', async function () {
+
+            await mineBlocks(150); // time travel lock duration
 
             let poolInfo0 = await unboundStaking.getPoolInfo(0);
 
@@ -333,6 +350,8 @@ describe('UnboundStaking', function () {
 
         it('withdrawAll - should transfer unbound token from staking contract to user account on withdrawAll', async function () {
 
+            await mineBlocks(150); // time travel lock duration
+
             await expect(unboundStaking.connect(signers[1]).withdrawAll(0))
                 .to.emit(unboundToken, "Transfer")
                 .withArgs(unboundStaking.address, signers[1].address, "100");
@@ -349,6 +368,8 @@ describe('UnboundStaking', function () {
 
 
         it('withdrawAll - should emit withdraw event', async function () {
+
+            await mineBlocks(150); // time travel lock duration
 
             let withdraw1 = await unboundStaking.connect(signers[1]).withdrawAll(0)
             let withdraw2 = await unboundStaking.connect(signers[2]).withdrawAll(0)
@@ -378,6 +399,8 @@ describe('UnboundStaking', function () {
 
         it('withdraw - should decrease user deposit amount', async function () {
 
+            await mineBlocks(150); // time travel lock duration
+
             let userInfoBefore1 = await unboundStaking.getUserInfo(0, signers[1].address);
             let userInfoBefore2 = await unboundStaking.getUserInfo(0, signers[2].address);
             let userInfoBefore3 = await unboundStaking.getUserInfo(0, signers[3].address);
@@ -403,6 +426,8 @@ describe('UnboundStaking', function () {
 
         it('withdraw - should decrease total stake amount after withdraw', async function () {
 
+            await mineBlocks(150); // time travel lock duration
+
             let poolInfo0 = await unboundStaking.getPoolInfo(0);
 
             expect(poolInfo0.totalStake).to.be.equal(1000);
@@ -426,6 +451,8 @@ describe('UnboundStaking', function () {
 
         it('withdraw - should transfer unbound token from staking contract to user account on withdraw', async function () {
 
+            await mineBlocks(150); // time travel lock duration
+
             await expect(unboundStaking.connect(signers[1]).withdraw(0, "50"))
                 .to.emit(unboundToken, "Transfer")
                 .withArgs(unboundStaking.address, signers[1].address, "50");
@@ -441,6 +468,8 @@ describe('UnboundStaking', function () {
         })
 
         it('withdraw - should emit withdraw event', async function () {
+
+            await mineBlocks(150); // time travel lock duration
 
             let withdraw1 = await unboundStaking.connect(signers[1]).withdraw(0, "50")
             let withdraw2 = await unboundStaking.connect(signers[2]).withdraw(0, "150")
@@ -467,6 +496,17 @@ describe('UnboundStaking', function () {
             await expect(withdraw3).to.emit(unboundToken, "Transfer").withArgs(unboundStaking.address, signers[3].address, "597")
                 
         })
+
+        it('withdrawAll - should revert if call before releaseBlock', async function () {
+            await expect(unboundStaking.connect(signers[1]).withdrawAll(0))
+                .to.be.revertedWith("withdraw: too early");
+        })
+
+        it('withdraw - should revert if call before releaseBlock', async function () {
+            await expect(unboundStaking.connect(signers[1]).withdraw(0, "50"))
+                .to.be.revertedWith("withdraw: too early");
+        })
+
 
     })
 
@@ -505,25 +545,27 @@ describe('UnboundStaking', function () {
             let currentBlock = await ethers.provider.getBlockNumber()
             startBlock = Number(currentBlock) + 2
             let endBlock = Number(startBlock) + POOL_PERIOD
+            let releaseBlock = Number(startBlock) + BLOCK_LOCK_DURATION
 
             await unboundStaking.addPool(
                 unboundToken.address, 
                 startBlock, 
-                endBlock, 
+                endBlock,
+                releaseBlock,
                 [UNB_REWARDS_PER_BLOCK]
             );
 
             // user 1 deposit 100 unb
             await unboundToken.connect(signers[1]).approve(unboundStaking.address, "100");
-            await unboundStaking.connect(signers[1]).deposit(0, "100", true);
+            await unboundStaking.connect(signers[1]).deposit(0, "100");
 
             // user 2 deposit 300 unb
             await unboundToken.connect(signers[2]).approve(unboundStaking.address, "300");
-            await unboundStaking.connect(signers[2]).deposit(0, "300", true);
+            await unboundStaking.connect(signers[2]).deposit(0, "300");
 
             // user 3 deposit 600 unb
             await unboundToken.connect(signers[3]).approve(unboundStaking.address, "600");
-            await unboundStaking.connect(signers[3]).deposit(0, "600", true);
+            await unboundStaking.connect(signers[3]).deposit(0, "600");
 
         })
 
@@ -553,7 +595,7 @@ describe('UnboundStaking', function () {
 
             let userInfoAfter = await unboundStaking.getUserInfo(0, signers[1].address);
 
-            expect(userInfoAfter.unclaimedRewards[0]).to.be.equal(0);
+            expect(userInfoAfter.unclaimedRewards[0]).to.be.equal(2);
             expect(userInfoAfter.lastRewardPerShares[0]).to.be.equal(26000000000);
 
         })
@@ -639,6 +681,57 @@ describe('UnboundStaking', function () {
             
         })
 
+        it('should increment unclaimedAmount if releaseBlock is not passed yet & set it to 0 once releseBlock passed', async function () {
+
+            let userInfo1 = await unboundStaking.getUserInfo(0, signers[1].address);
+            let userInfo2 = await unboundStaking.getUserInfo(0, signers[2].address);
+            let userInfo3 = await unboundStaking.getUserInfo(0, signers[3].address);
+
+            expect(userInfo1.unclaimedRewards[0]).to.be.equal(0);
+            expect(userInfo2.unclaimedRewards[0]).to.be.equal(0);
+            expect(userInfo3.unclaimedRewards[0]).to.be.equal(0);
+
+            await mineBlocks(50);
+
+            await unboundStaking.connect(signers[1]).harvest(0)
+            await unboundStaking.connect(signers[2]).harvest(0)
+            await unboundStaking.connect(signers[3]).harvest(0)
+
+            let userInfo11 = await unboundStaking.getUserInfo(0, signers[1].address);
+            let userInfo22 = await unboundStaking.getUserInfo(0, signers[2].address);
+            let userInfo33 = await unboundStaking.getUserInfo(0, signers[3].address);
+
+            expect(userInfo11.unclaimedRewards[0]).to.be.equal(7);
+            expect(userInfo22.unclaimedRewards[0]).to.be.equal(17);
+            expect(userInfo33.unclaimedRewards[0]).to.be.equal(31);
+
+            await mineBlocks(150);
+
+            let harvest1 = await unboundStaking.connect(signers[1]).harvest(0)
+            let harvest2 = await unboundStaking.connect(signers[2]).harvest(0)
+            let harvest3 = await unboundStaking.connect(signers[3]).harvest(0)
+
+            await expect(harvest1).to.emit(unboundStaking, "Harvest")
+                .withArgs(signers[1].address, 0, unboundToken.address, "22", harvest1.blockNumber)
+
+            await expect(harvest2).to.emit(unboundStaking, "Harvest")
+                .withArgs(signers[2].address, 0, unboundToken.address, "62", harvest2.blockNumber)
+
+            await expect(harvest3).to.emit(unboundStaking, "Harvest")
+                .withArgs(signers[3].address, 0, unboundToken.address, "122", harvest3.blockNumber)
+
+            let userInfo111 = await unboundStaking.getUserInfo(0, signers[1].address);
+            let userInfo222 = await unboundStaking.getUserInfo(0, signers[2].address);
+            let userInfo333 = await unboundStaking.getUserInfo(0, signers[3].address);
+
+            expect(userInfo111.unclaimedRewards[0]).to.be.equal(0);
+            expect(userInfo222.unclaimedRewards[0]).to.be.equal(0);
+            expect(userInfo333.unclaimedRewards[0]).to.be.equal(0);
+
+            
+        })
+
+
     })
 
     describe('#emergencyWithdraw', async () => {
@@ -666,17 +759,19 @@ describe('UnboundStaking', function () {
             let currentBlock = await ethers.provider.getBlockNumber()
             startBlock = Number(currentBlock) + 2
             let endBlock = Number(startBlock) + POOL_PERIOD
+            let releaseBlock = Number(startBlock) + BLOCK_LOCK_DURATION
 
             await unboundStaking.addPool(
                 unboundToken.address, 
                 startBlock, 
-                endBlock, 
+                endBlock,
+                releaseBlock,
                 [UNB_REWARDS_PER_BLOCK]
             );
 
             // user 1 deposit 100 unb
             await unboundToken.connect(signers[1]).approve(unboundStaking.address, "100");
-            await unboundStaking.connect(signers[1]).deposit(0, "100", true);
+            await unboundStaking.connect(signers[1]).deposit(0, "100");
 
         })
 
@@ -749,17 +844,19 @@ describe('UnboundStaking', function () {
             let currentBlock = await ethers.provider.getBlockNumber()
             startBlock = Number(currentBlock) + 2
             let endBlock = Number(startBlock) + POOL_PERIOD
+            let releaseBlock = Number(startBlock) + BLOCK_LOCK_DURATION
 
             await unboundStaking.addPool(
                 unboundToken.address, 
                 startBlock, 
-                endBlock, 
+                endBlock,
+                releaseBlock,
                 [UNB_REWARDS_PER_BLOCK]
             );
 
             // user 1 deposit 100 unb
             await unboundToken.connect(signers[1]).approve(unboundStaking.address, "100");
-            await unboundStaking.connect(signers[1]).deposit(0, "100", true);
+            await unboundStaking.connect(signers[1]).deposit(0, "100");
 
         })
 
