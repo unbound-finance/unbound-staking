@@ -10,7 +10,7 @@ async function main() {
 
     let startBlock = "";
     let endBlock = "";
-    let releaseBlock = "";
+    let maxStakingLimit = "";
     let unbRewardsPerBlock = "";
 
     const unboundStaking = await ethers.getContractAt('UnboundStaking', UNBOUND_STAKING_CONTRACT);
@@ -19,7 +19,7 @@ async function main() {
         UNB_TOKEN,
         startBlock,
         endBlock,
-        releaseBlock,
+        maxStakingLimit,
         [unbRewardsPerBlock]
     )
 

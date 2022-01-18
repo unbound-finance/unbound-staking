@@ -8,46 +8,29 @@ interface IUnboundStaking {
    * @param _stakeToken: token to be staked to the pool
    * @param _startBlock: block where the reward starts
    * @param _endBlock: block where the reward ends
-   * @param _releaseBlock: block number when user can withdraw deposited token and rewards
+   * @param _maxStakeLimit: maximum number of staking tokens that can be staked
    * @param _rewardPerBlocks: amount of reward token per block for the pool
    */
   function addPool(
     address _stakeToken,
     uint32 _startBlock,
     uint32 _endBlock,
-    uint32 _releaseBlock,
-    uint256[] calldata _rewardPerBlocks
-  ) external;
-
-  /**
-   * @dev Renew a pool to start another liquidity mining program
-   * @param _pid: id of the pool to renew, must be pool that has not started or already ended
-   * @param _startBlock: block where the reward starts
-   * @param _endBlock: block where the reward ends
-   * @param _releaseBlock: block where user can unlock their deposit and rewards
-   * @param _rewardPerBlocks: amount of reward token per block for the pool
-   *   0 if we want to stop the pool from accumulating rewards
-   */
-  function renewPool(
-    uint256 _pid,
-    uint32 _startBlock,
-    uint32 _endBlock,
-    uint32 _releaseBlock,
+    uint256 _maxStakeLimit,
     uint256[] calldata _rewardPerBlocks
   ) external;
 
   /**
    * @dev Update a pool, allow to change end block, reward per block
    * @param _pid: pool id to be renew
+   * @param _startBlock: block where the rewards will start
    * @param _endBlock: block where the reward ends
-   * @param _releaseBlock: block where user can unlock their deposit and rewards
    * @param _rewardPerBlocks: amount of reward token per block for the pool
    *   0 if we want to stop the pool from accumulating rewards
    */
   function updatePool(
     uint256 _pid,
+    uint32 _startBlock,
     uint32 _endBlock,
-    uint32 _releaseBlock,
     uint256[] calldata _rewardPerBlocks
   ) external;
 
@@ -113,7 +96,7 @@ interface IUnboundStaking {
       uint32 startBlock,
       uint32 endBlock,
       uint32 lastRewardBlock,
-      uint256 releaseBlock,
+      uint256 maxStakeLimit,
       uint256[] memory rewardPerBlocks,
       uint256[] memory accRewardPerShares);
 

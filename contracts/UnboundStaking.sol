@@ -55,13 +55,14 @@ contract UnboundStaking is IUnboundStaking, PermissionAdmin, ReentrancyGuard {
   // startBlock: the block that the reward starts
   // endBlock: the block that the reward ends
   // lastRewardBlock: last block number that rewards distribution occurs
+  // maxStakeLimit: maximum number of staking tokens that can be staked, 0 means unlimited
   struct PoolInfo {
     uint256 totalStake;
     address stakeToken;
     uint32 startBlock;
     uint32 endBlock;
     uint32 lastRewardBlock;
-    uint32 releaseBlock;
+    uint256 maxStakeLimit;
     mapping (uint256 => PoolRewardData) poolRewardData;
   }
 
@@ -78,6 +79,8 @@ contract UnboundStaking is IUnboundStaking, PermissionAdmin, ReentrancyGuard {
   // Info of each user that stakes Staking tokens.
   mapping(uint256 => mapping(address => UserInfo)) internal userInfo;
 
+  bool public allowEmergencyExits;
+
   event AddNewPool(
     address indexed stakeToken,
     uint32 indexed startBlock,
@@ -92,6 +95,7 @@ contract UnboundStaking is IUnboundStaking, PermissionAdmin, ReentrancyGuard {
   );
   event UpdatePool(
     uint256 indexed pid,
+    uint32 indexed startBlock,
     uint32 indexed endBlock,
     uint256[] rewardPerBlocks
   );
@@ -148,14 +152,14 @@ contract UnboundStaking is IUnboundStaking, PermissionAdmin, ReentrancyGuard {
    * @param _stakeToken: token to be staked to the pool
    * @param _startBlock: block where the reward starts
    * @param _endBlock: block where the reward ends
-   * @param _releaseBlock: block number until user can not withdraw deposited amounts & rewards
+   * @param _maxStakeLimit: maximum number of staking tokens that can be staked, 0 means unlimited
    * @param _rewardPerBlocks: amount of reward token per block for the pool for each reward token
    */
   function addPool(
     address _stakeToken,
     uint32 _startBlock,
     uint32 _endBlock,
-    uint32 _releaseBlock,
+    uint256 _maxStakeLimit,
     uint256[] calldata _rewardPerBlocks
   ) external override onlyAdmin {
     require(!poolExists[_stakeToken], 'add: duplicated pool');
@@ -168,7 +172,7 @@ contract UnboundStaking is IUnboundStaking, PermissionAdmin, ReentrancyGuard {
     poolInfo[poolLength].startBlock = _startBlock;
     poolInfo[poolLength].endBlock = _endBlock;
     poolInfo[poolLength].lastRewardBlock = _startBlock;
-    poolInfo[poolLength].releaseBlock = _releaseBlock;
+    poolInfo[poolLength].maxStakeLimit = _maxStakeLimit;
 
     for(uint256 i = 0; i < _rewardPerBlocks.length; i++) {
       poolInfo[poolLength].poolRewardData[i] = PoolRewardData({
@@ -185,75 +189,37 @@ contract UnboundStaking is IUnboundStaking, PermissionAdmin, ReentrancyGuard {
   }
 
   /**
-   * @dev Renew a pool to start another liquidity mining program
-   * @param _pid: id of the pool to renew, must be pool that has not started or already ended
-   * @param _startBlock: block where the reward starts
-   * @param _endBlock: block where the reward ends
-   * @param _releaseBlock: block where user can unlock their deposit and rewards
-   * @param _rewardPerBlocks: amount of reward token per block for the pool
-   *   0 if we want to stop the pool from accumulating rewards
-   */
-  function renewPool(
-    uint256 _pid,
-    uint32 _startBlock,
-    uint32 _endBlock,
-    uint32 _releaseBlock,
-    uint256[] calldata _rewardPerBlocks
-  ) external override onlyAdmin {
-    updatePoolRewards(_pid);
-
-    PoolInfo storage pool = poolInfo[_pid];
-    // check if pool has not started or already ended
-    require(
-      pool.startBlock > block.number || pool.endBlock < block.number,
-      'renew: invalid pool state to renew'
-    );
-    // checking data of new pool
-    require(rewardTokens.length == _rewardPerBlocks.length, 'renew: invalid length');
-    require(_startBlock > block.number && _endBlock > _startBlock, 'renew: invalid blocks');
-
-    pool.startBlock = _startBlock;
-    pool.endBlock = _endBlock;
-    pool.lastRewardBlock = _startBlock;
-    pool.releaseBlock = _releaseBlock;
-
-    for(uint256 i = 0; i < _rewardPerBlocks.length; i++) {
-      pool.poolRewardData[i].rewardPerBlock = _rewardPerBlocks[i];
-    }
-
-    emit RenewPool(_pid, _startBlock, _endBlock, _rewardPerBlocks);
-  }
-
-  /**
    * @dev Update a pool, allow to change end block, reward per block
    * @param _pid: pool id to be renew
+   * @param _startBlock: block where the rewards will start
    * @param _endBlock: block where the reward ends
-   * @param _releaseBlock: block where user can unlock their deposit and rewards
    * @param _rewardPerBlocks: amount of reward token per block for the pool,
    *   0 if we want to stop the pool from accumulating rewards
    */
   function updatePool(
     uint256 _pid,
+    uint32 _startBlock,
     uint32 _endBlock,
-    uint32 _releaseBlock,
     uint256[] calldata _rewardPerBlocks
   ) external override onlyAdmin {
     updatePoolRewards(_pid);
 
     PoolInfo storage pool = poolInfo[_pid];
 
-    // should call renew pool if the pool has ended
+    // require(pool.startBlock > block.number, 'update: pool already started');
     require(pool.endBlock > block.number, 'update: pool already ended');
     require(rewardTokens.length == _rewardPerBlocks.length, 'update: invalid length');
     require(_endBlock > block.number && _endBlock > pool.startBlock, 'update: invalid end block');
 
+    pool.startBlock = _startBlock;
     pool.endBlock = _endBlock;
-    pool.releaseBlock = _releaseBlock;
+    pool.lastRewardBlock = _startBlock;
+
     for(uint256 i = 0; i < _rewardPerBlocks.length; i++) {
       pool.poolRewardData[i].rewardPerBlock = _rewardPerBlocks[i];
     }
 
-    emit UpdatePool(_pid, _endBlock, _rewardPerBlocks);
+    emit UpdatePool(_pid, _startBlock, _endBlock, _rewardPerBlocks);
   }
 
   /**
@@ -265,11 +231,20 @@ contract UnboundStaking is IUnboundStaking, PermissionAdmin, ReentrancyGuard {
     uint256 _pid,
     uint256 _amount
   ) external override nonReentrant {
+    PoolInfo storage pool = poolInfo[_pid];
+
+    // can only deposit before pool started
+    require(pool.startBlock > block.number, 'deposit: pool already started');
+
+    // check if maximum staking limit is reached or not
+    if(pool.maxStakeLimit != 0){
+      require(pool.maxStakeLimit >= pool.totalStake.add(_amount), 'deposit: maximum stake limit reached');
+    }
+
     // update pool rewards, user's rewards
     updatePoolRewards(_pid);
     _updateUserReward(msg.sender, _pid, false);
 
-    PoolInfo storage pool = poolInfo[_pid];
     UserInfo storage user = userInfo[_pid][msg.sender];
 
     // collect stakeToken
@@ -299,6 +274,10 @@ contract UnboundStaking is IUnboundStaking, PermissionAdmin, ReentrancyGuard {
     _withdraw(_pid, userInfo[_pid][msg.sender].amount);
   }
 
+  function changeEmergencyExits(bool _exit) external onlyAdmin {
+    allowEmergencyExits = _exit;
+  }
+
   /**
    * @notice EMERGENCY USAGE ONLY, USER'S REWARDS WILL BE RESET
    * @dev Emergency withdrawal function to allow withdraw all deposited tokens (of the sender)
@@ -306,6 +285,7 @@ contract UnboundStaking is IUnboundStaking, PermissionAdmin, ReentrancyGuard {
    * @param _pid: id of the pool
    */
   function emergencyWithdraw(uint256 _pid) external override nonReentrant {
+    require(allowEmergencyExits, 'emergencyWithdraw: not allowed at the moment');
     PoolInfo storage pool = poolInfo[_pid];
     UserInfo storage user = userInfo[_pid][msg.sender];
     uint256 amount = user.amount;
@@ -410,7 +390,7 @@ contract UnboundStaking is IUnboundStaking, PermissionAdmin, ReentrancyGuard {
       uint32 startBlock,
       uint32 endBlock,
       uint32 lastRewardBlock,
-      uint256 releaseBlock,
+      uint256 maxStakeLimit,
       uint256[] memory rewardPerBlocks,
       uint256[] memory accRewardPerShares
     )
@@ -422,14 +402,14 @@ contract UnboundStaking is IUnboundStaking, PermissionAdmin, ReentrancyGuard {
       startBlock,
       endBlock,
       lastRewardBlock,
-      releaseBlock
+      maxStakeLimit
     ) = (
       pool.totalStake,
       pool.stakeToken,
       pool.startBlock,
       pool.endBlock,
       pool.lastRewardBlock,
-      pool.releaseBlock
+      pool.maxStakeLimit
     );
     rewardPerBlocks = new uint256[](rewardTokens.length);
     accRewardPerShares = new uint256[](rewardTokens.length);
@@ -466,7 +446,7 @@ contract UnboundStaking is IUnboundStaking, PermissionAdmin, ReentrancyGuard {
    */
   function harvest(uint256 _pid) public override {
     updatePoolRewards(_pid);
-    _updateUserReward(msg.sender, _pid, poolInfo[_pid].releaseBlock <= block.number ? true : false);
+    _updateUserReward(msg.sender, _pid, poolInfo[_pid].endBlock <= block.number ? true : false);
   }
 
   /**
@@ -498,7 +478,7 @@ contract UnboundStaking is IUnboundStaking, PermissionAdmin, ReentrancyGuard {
     PoolInfo storage pool = poolInfo[_pid];
     UserInfo storage user = userInfo[_pid][msg.sender];
     require(user.amount >= _amount, 'withdraw: insufficient amount');
-    require(pool.releaseBlock <= block.number, 'withdraw: too early');
+    require(block.number < pool.startBlock || pool.endBlock <= block.number, 'withdraw: too early');
     // update pool reward and harvest
     updatePoolRewards(_pid);
     _updateUserReward(msg.sender, _pid, true);
