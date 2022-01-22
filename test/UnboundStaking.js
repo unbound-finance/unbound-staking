@@ -566,6 +566,18 @@ describe('UnboundStaking', function () {
                 .to.be.revertedWith("withdraw: too early");
         })
 
+        it('withdrawAll - should revert if withdraw before startBlock', async function () {
+
+            await expect(unboundStaking.connect(signers[1]).withdrawAll(0))
+                .to.be.revertedWith("withdraw: too early");
+        })
+
+        it('withdraw - should revert if withdraw before startBlock', async function () {
+
+            await expect(unboundStaking.connect(signers[1]).withdraw(0, "50"))
+                .to.be.revertedWith("withdraw: too early");
+        })
+
 
     })
 

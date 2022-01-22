@@ -478,7 +478,7 @@ contract UnboundStaking is IUnboundStaking, PermissionAdmin, ReentrancyGuard {
     PoolInfo storage pool = poolInfo[_pid];
     UserInfo storage user = userInfo[_pid][msg.sender];
     require(user.amount >= _amount, 'withdraw: insufficient amount');
-    require(block.number < pool.startBlock || pool.endBlock <= block.number, 'withdraw: too early');
+    require(pool.endBlock <= block.number, 'withdraw: too early');
     // update pool reward and harvest
     updatePoolRewards(_pid);
     _updateUserReward(msg.sender, _pid, true);
