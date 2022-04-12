@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 pragma abicoder v2;
 
-interface IUnboundStaking {
+interface IMultiRewardStaking {
   /**
    * @dev Add a new lp to the pool. Can only be called by the admin.
    * @param _stakeToken: token to be staked to the pool

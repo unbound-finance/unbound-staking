@@ -8,13 +8,13 @@ import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {SafeCast} from '@openzeppelin/contracts/utils/math/SafeCast.sol';
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {PermissionAdmin} from './PermissionAdmin.sol';
-import {IUnboundStaking} from './interfaces/IUnboundStaking.sol';
+import {IMultiRewardStaking} from './interfaces/IMultiRewardStaking.sol';
 
-/// Allow stakers to stake unbound token and receive reward tokens
+/// Allow stakers to stake token and receive reward tokens
 /// Allow extend or renew a pool to continue/restart the staking program
 /// When harvesting, rewards will be transferred to a user account
 /// Support multiple reward tokens, reward tokens must be distinct and immutable
-contract UnboundStaking is IUnboundStaking, PermissionAdmin, ReentrancyGuard {
+contract MultiRewardStaking is IMultiRewardStaking, PermissionAdmin, ReentrancyGuard {
   using SafeMath for uint256;
   using SafeCast for uint256;
   using SafeERC20 for IERC20;
@@ -320,7 +320,7 @@ contract UnboundStaking is IUnboundStaking, PermissionAdmin, ReentrancyGuard {
       pid = _pids[i];
       updatePoolRewards(pid);
       // update user reward without harvesting
-      _updateUserReward(account, pid, false);
+      _updateUserReward(account, pid, true);
 
       for(uint256 j = 0; j < rTokens.length; j++) {
         uint256 reward = userInfo[pid][account].userRewardData[j].unclaimedReward;
@@ -446,7 +446,7 @@ contract UnboundStaking is IUnboundStaking, PermissionAdmin, ReentrancyGuard {
    */
   function harvest(uint256 _pid) public override {
     updatePoolRewards(_pid);
-    _updateUserReward(msg.sender, _pid, poolInfo[_pid].endBlock <= block.number ? true : false);
+    _updateUserReward(msg.sender, _pid, true);
   }
 
   /**
@@ -478,7 +478,6 @@ contract UnboundStaking is IUnboundStaking, PermissionAdmin, ReentrancyGuard {
     PoolInfo storage pool = poolInfo[_pid];
     UserInfo storage user = userInfo[_pid][msg.sender];
     require(user.amount >= _amount, 'withdraw: insufficient amount');
-    require(pool.endBlock <= block.number, 'withdraw: too early');
     // update pool reward and harvest
     updatePoolRewards(_pid);
     _updateUserReward(msg.sender, _pid, true);
