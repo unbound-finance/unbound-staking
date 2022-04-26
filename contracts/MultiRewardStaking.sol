@@ -10,6 +10,14 @@ import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {PermissionAdmin} from './PermissionAdmin.sol';
 import {IMultiRewardStaking} from './interfaces/IMultiRewardStaking.sol';
 
+interface ArbSys {
+    /**
+    * @notice Get Arbitrum block number (distinct from L1 block number; Arbitrum genesis block has block number 0)
+    * @return block number as int
+     */ 
+    function arbBlockNumber() external view returns (uint);
+} 
+
 /// Allow stakers to stake token and receive reward tokens
 /// Allow extend or renew a pool to continue/restart the staking program
 /// When harvesting, rewards will be transferred to a user account
@@ -166,7 +174,8 @@ contract MultiRewardStaking is IMultiRewardStaking, PermissionAdmin, ReentrancyG
     require(_stakeToken != address(0), 'add: invalid stake token');
     require(rewardTokens.length == _rewardPerBlocks.length, 'add: invalid length');
 
-    require(_startBlock > block.number && _endBlock > _startBlock, 'add: invalid blocks');
+    uint256 _currBlock = getBlockNumber();
+    require(_startBlock > _currBlock && _endBlock > _startBlock, 'add: invalid blocks');
 
     poolInfo[poolLength].stakeToken = _stakeToken;
     poolInfo[poolLength].startBlock = _startBlock;
@@ -205,11 +214,13 @@ contract MultiRewardStaking is IMultiRewardStaking, PermissionAdmin, ReentrancyG
     updatePoolRewards(_pid);
 
     PoolInfo storage pool = poolInfo[_pid];
+    uint256 _currBlock = getBlockNumber();
 
-    // require(pool.startBlock > block.number, 'update: pool already started');
-    require(pool.endBlock > block.number, 'update: pool already ended');
+    // require(pool.startBlock > _currBlock, 'update: pool already started');
+
+    require(pool.endBlock > _currBlock, 'update: pool already ended');
     require(rewardTokens.length == _rewardPerBlocks.length, 'update: invalid length');
-    require(_endBlock > block.number && _endBlock > pool.startBlock, 'update: invalid end block');
+    require(_endBlock > _currBlock && _endBlock > pool.startBlock, 'update: invalid end block');
 
     pool.startBlock = _startBlock;
     pool.endBlock = _endBlock;
@@ -233,8 +244,10 @@ contract MultiRewardStaking is IMultiRewardStaking, PermissionAdmin, ReentrancyG
   ) external override nonReentrant {
     PoolInfo storage pool = poolInfo[_pid];
 
+    uint256 _currBlock = getBlockNumber();
+
     // can only deposit before pool started
-    require(pool.startBlock > block.number, 'deposit: pool already started');
+    require(pool.startBlock > _currBlock, 'deposit: pool already started');
 
     // check if maximum staking limit is reached or not
     if(pool.maxStakeLimit != 0){
@@ -254,7 +267,7 @@ contract MultiRewardStaking is IMultiRewardStaking, PermissionAdmin, ReentrancyG
     user.amount = user.amount.add(_amount);
     pool.totalStake = pool.totalStake.add(_amount);
 
-    emit Deposit(msg.sender, _pid, block.number, _amount);
+    emit Deposit(msg.sender, _pid, _currBlock, _amount);
   }
 
   /**
@@ -303,7 +316,8 @@ contract MultiRewardStaking is IMultiRewardStaking, PermissionAdmin, ReentrancyG
       IERC20(pool.stakeToken).safeTransfer(msg.sender, amount);
     }
 
-    emit EmergencyWithdraw(msg.sender, _pid, block.number, amount);
+    uint256 _currBlock = getBlockNumber();
+    emit EmergencyWithdraw(msg.sender, _pid, _currBlock, amount);
   }
 
   /**
@@ -315,6 +329,7 @@ contract MultiRewardStaking is IMultiRewardStaking, PermissionAdmin, ReentrancyG
     uint256[] memory totalRewards = new uint256[](rTokens.length);
     address account = msg.sender;
     uint256 pid;
+    uint256 _currBlock = getBlockNumber();
 
     for (uint256 i = 0; i < _pids.length; i++) {
       pid = _pids[i];
@@ -327,7 +342,7 @@ contract MultiRewardStaking is IMultiRewardStaking, PermissionAdmin, ReentrancyG
         if (reward > 0) {
           totalRewards[j] = totalRewards[j].add(reward);
           userInfo[pid][account].userRewardData[j].unclaimedReward = 0;
-          emit Harvest(account, pid, rTokens[j], reward, block.number);
+          emit Harvest(account, pid, rTokens[j], reward, _currBlock);
         }
       }
     }
@@ -486,8 +501,9 @@ contract MultiRewardStaking is IMultiRewardStaking, PermissionAdmin, ReentrancyG
     pool.totalStake = pool.totalStake.sub(_amount);
 
     IERC20(pool.stakeToken).safeTransfer(msg.sender, _amount);
+    uint256 _currBlock = getBlockNumber();
 
-    emit Withdraw(msg.sender, _pid, block.number, _amount);
+    emit Withdraw(msg.sender, _pid, _currBlock, _amount);
   }
 
   /**
@@ -500,6 +516,7 @@ contract MultiRewardStaking is IMultiRewardStaking, PermissionAdmin, ReentrancyG
   ) internal {
     uint256 userAmount = userInfo[_pid][_to].amount;
     uint256 rTokensLength = rewardTokens.length;
+    uint256 _currBlock = getBlockNumber();
 
     if (userAmount == 0) {
       // update user last reward per share to the latest pool reward per share
@@ -525,17 +542,26 @@ contract MultiRewardStaking is IMultiRewardStaking, PermissionAdmin, ReentrancyG
 
       if (shouldHarvest && _pending > 0) {
         _safeTransferRewards(IERC20(rewardTokens[i]), _to, _pending);
-        emit Harvest(_to, _pid, rewardTokens[i], _pending, block.number);
+        emit Harvest(_to, _pid, rewardTokens[i], _pending, _currBlock);
       }
     }
+  }
+
+  /**
+   * @dev Returns current block number for arbitrum network
+   */
+  function getBlockNumber() public view returns (uint256 blockNumber) {
+    blockNumber = ArbSys(address(100)).arbBlockNumber();
   }
 
   /**
    * @dev Returns last accounted reward block, either the current block number or the endBlock of the pool
    */
   function _lastAccountedRewardBlock(uint256 _pid) internal view returns (uint32 _value) {
+    uint256 _currBlock = getBlockNumber();
+
     _value = poolInfo[_pid].endBlock;
-    if (_value > block.number) _value = block.number.toUint32();
+    if (_value > _currBlock) _value = _currBlock.toUint32();
   }
 
   /**
