@@ -207,7 +207,6 @@ contract MultiRewardStaking is IMultiRewardStaking, PermissionAdmin, ReentrancyG
 
     PoolInfo storage pool = poolInfo[_pid];
 
-    // require(pool.startBlock > block.number, 'update: pool already started');
     require(pool.endBlock > block.number, 'update: pool already ended');
     require(rewardTokens.length == _rewardPerBlocks.length, 'update: invalid length');
     require(_endBlock > block.number && _endBlock > pool.startBlock, 'update: invalid end block');
@@ -259,9 +258,6 @@ contract MultiRewardStaking is IMultiRewardStaking, PermissionAdmin, ReentrancyG
   function _deposit(address _user, uint256 _pid, uint256 _amount) internal {
     
     PoolInfo storage pool = poolInfo[_pid];
-
-    // can only deposit before pool started
-    require(pool.startBlock > block.number, 'deposit: pool already started');
 
     // check if maximum staking limit is reached or not
     if(pool.maxStakeLimit != 0){
