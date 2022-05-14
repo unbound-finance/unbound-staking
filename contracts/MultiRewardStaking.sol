@@ -7,6 +7,7 @@ import {SafeMath} from '@openzeppelin/contracts/utils/math/SafeMath.sol';
 import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import {SafeCast} from '@openzeppelin/contracts/utils/math/SafeCast.sol';
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/draft-IERC20Permit.sol";
 import {PermissionAdmin} from './PermissionAdmin.sol';
 import {IMultiRewardStaking} from './interfaces/IMultiRewardStaking.sol';
 
@@ -231,6 +232,32 @@ contract MultiRewardStaking is IMultiRewardStaking, PermissionAdmin, ReentrancyG
     uint256 _pid,
     uint256 _amount
   ) external override nonReentrant {
+    // deposit staking token
+    _deposit(msg.sender, _pid, _amount);
+  }
+
+  function depositWithPermit(
+    uint256 _pid,
+    uint256 _amount,
+    uint256 _deadline,
+    uint8 _v,
+    bytes32 _r, 
+    bytes32 _s
+  ) external override nonReentrant {
+      PoolInfo storage pool = poolInfo[_pid];
+      
+      // get approval using permit
+      IERC20Permit(pool.stakeToken).permit(msg.sender, address(this), _amount, _deadline, _v, _r, _s);
+
+      // check if contract have proper allowance or not
+      require(IERC20(pool.stakeToken).allowance(msg.sender, address(this)) == _amount, 'A');
+
+      // deposit staking token
+      _deposit(msg.sender, _pid, _amount);
+  }
+
+  function _deposit(address _user, uint256 _pid, uint256 _amount) internal {
+    
     PoolInfo storage pool = poolInfo[_pid];
 
     // can only deposit before pool started
@@ -241,20 +268,20 @@ contract MultiRewardStaking is IMultiRewardStaking, PermissionAdmin, ReentrancyG
       require(pool.maxStakeLimit >= pool.totalStake.add(_amount), 'deposit: maximum stake limit reached');
     }
 
+    // collect stakeToken
+    IERC20(pool.stakeToken).safeTransferFrom(_user, address(this), _amount);
+
     // update pool rewards, user's rewards
     updatePoolRewards(_pid);
-    _updateUserReward(msg.sender, _pid, false);
+    _updateUserReward(_user, _pid, false);
 
-    UserInfo storage user = userInfo[_pid][msg.sender];
-
-    // collect stakeToken
-    IERC20(pool.stakeToken).safeTransferFrom(msg.sender, address(this), _amount);
+    UserInfo storage user = userInfo[_pid][_user];
 
     // update user staked amount, and total staked amount for the pool
     user.amount = user.amount.add(_amount);
     pool.totalStake = pool.totalStake.add(_amount);
 
-    emit Deposit(msg.sender, _pid, block.number, _amount);
+    emit Deposit(_user, _pid, block.number, _amount);
   }
 
   /**
