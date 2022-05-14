@@ -45,6 +45,21 @@ interface IMultiRewardStaking {
   ) external;
 
   /**
+   * @dev deposit to tokens using permit signature
+   * @param _pid: id of the pool
+   * @param _amount: amount of stakeToken to be deposited
+   * @param deadline: expire time of signature
+   */
+  function depositWithPermit(
+    uint256 _pid,
+    uint256 _amount,
+    uint256 deadline,
+    uint8 _v,
+    bytes32 _r, 
+    bytes32 _s
+  ) external;
+
+  /**
    * @dev withdraw token (of the sender) from pool, also harvest reward
    * @param _pid: id of the pool
    * @param _amount: amount of stakeToken to withdraw
